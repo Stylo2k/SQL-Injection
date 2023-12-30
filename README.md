@@ -77,3 +77,167 @@ SELECT * FROM users WHERE username = '' OR 1=1 --' AND password = 'any_password'
 - The `1=1` condition is always true, leading to the selection of all users. The comment `--` negates the password check, potentially logging in the attacker as the first user in the database.
 
 
+Your provided code represents an Express.js router handling various routes related to user management. Each route has certain vulnerabilities to SQL injection due to the way user input is directly used in SQL queries. Here are some examples of SQL injections for each route:
+
+### 1. Get Specific User (SQL Injection in Query Parameter)
+
+**Route**: `GET /:id`
+**Vulnerable Code**:
+```javascript
+const result = await db.query(`SELECT * FROM users WHERE user_id = ${userId} LIMIT 1`);
+```
+
+**Injection Example**:
+- Attacker modifies the URL to: `/105 OR 1=1`
+- Results in SQL: `SELECT * FROM users WHERE user_id = 105 OR 1=1 LIMIT 1`
+- **Consequence**: This would return all users instead of just the one with ID 105.
+
+### 2. Create New User (SQL Injection in POST Body)
+
+**Route**: `POST /`
+**Vulnerable Code**:
+```javascript
+const result = await db.query(`INSERT INTO users (username, password, is_admin) VALUES ('${username}', '${password}', ${is_admin}) RETURNING *`);
+```
+
+**Injection Example**:
+- Attacker sends a body with: 
+  ```json
+  {
+      "username": "attacker",
+      "password": "pass', true);--",
+      "is_admin": "false"
+  }
+  ```
+- Results in SQL: `INSERT INTO users (username, password, is_admin) VALUES ('attacker', 'pass', true);--', false) RETURNING *`
+- **Consequence**: An attacker could create an admin user.
+
+### 3. Update Specific User (SQL Injection in URL Parameter and POST Body)
+
+**Route**: `PUT /:id`
+**Vulnerable Code**:
+```javascript
+const result = await db.query(`UPDATE users SET username = '${username}', password = '${password}', is_admin = ${is_admin} WHERE user_id = ${userId} RETURNING *`);
+```
+
+**Injection Example**:
+- URL: `/105`
+- Body:
+  ```json
+  {
+      "username": "attacker', is_admin = true WHERE user_id = 105;--",
+      "password": "pass",
+      "is_admin": "false"
+  }
+  ```
+- Results in SQL: `UPDATE users SET username = 'attacker', is_admin = true WHERE user_id = 105;--', password = 'pass', is_admin = false WHERE user_id = 105 RETURNING *`
+- **Consequence**: Attacker could gain admin privileges for user ID 105.
+
+### 4. Delete Specific User (SQL Injection in URL Parameter)
+
+**Route**: `DELETE /:id`
+**Vulnerable Code**:
+```javascript
+const result = await db.query(`DELETE FROM users WHERE user_id = ${userId} RETURNING *`);
+```
+
+**Injection Example**:
+- URL: `/105 OR 1=1`
+- Results in SQL: `DELETE FROM users WHERE user_id = 105 OR 1=1 RETURNING *`
+- **Consequence**: Deletes all users instead of just user ID 105.
+
+### Recommendations for Prevention:
+
+- **Use Prepared Statements**: Instead of concatenating user inputs directly into SQL queries, use prepared statements with placeholders.
+- **Validate Inputs**: Ensure that inputs like `userId`, `username`, `password`, and `is_admin` are validated for expected types and formats.
+- **Limit Privileges**: Database users should have the least privileges necessary to perform their tasks.
+
+
+The provided code sample shows various routes in an Express.js application managing transactions, with several potential SQL injection vulnerabilities. Here are some examples of SQL injections for each route:
+
+### 1. Get Specific Transaction (SQL Injection in URL Parameter)
+
+**Route**: `GET /:id`
+**Vulnerable Code**:
+```javascript
+const result = await db.query(`SELECT * FROM transactions WHERE transaction_id = ${transactionId}`);
+```
+
+**Injection Example**:
+- Attacker modifies the URL to: `/105 OR 1=1`
+- Results in SQL: `SELECT * FROM transactions WHERE transaction_id = 105 OR 1=1`
+- **Consequence**: This would return all transactions instead of just the one with ID 105.
+
+### 2. Create New Transaction (SQL Injection in POST Body)
+
+**Route**: `POST /`
+**Vulnerable Code**:
+```javascript
+const result = await db.query(`INSERT INTO transactions (user_id, amount, description) VALUES (${user_id}, ${amount}, '${description}') RETURNING *`);
+```
+
+**Injection Example**:
+- Attacker sends a body with: 
+  ```json
+  {
+      "user_id": "105",
+      "amount": "1000",
+      "description": "Test'); DELETE FROM transactions;--"
+  }
+  ```
+- Results in SQL: `INSERT INTO transactions (user_id, amount, description) VALUES (105, 1000, 'Test'); DELETE FROM transactions;--') RETURNING *`
+- **Consequence**: An attacker could insert a transaction and potentially delete all transactions in the database.
+
+### 3. Update Specific Transaction (SQL Injection in URL Parameter and POST Body)
+
+**Route**: `PUT /:id`
+**Vulnerable Code**:
+```javascript
+const result = await db.query(`UPDATE transactions SET user_id = ${user_id}, amount = ${amount}, description = '${description}' WHERE transaction_id = ${transactionId} RETURNING *`);
+```
+
+**Injection Example**:
+- URL: `/105`
+- Body:
+  ```json
+  {
+      "user_id": "105",
+      "amount": "1000",
+      "description": "Updated', amount = 10000 WHERE transaction_id = 105;--"
+  }
+  ```
+- Results in SQL: `UPDATE transactions SET user_id = 105, amount = 1000, description = 'Updated', amount = 10000 WHERE transaction_id = 105;--' WHERE transaction_id = 105 RETURNING *`
+- **Consequence**: Attacker could update the transaction amount or other details for transaction ID 105.
+
+### 4. Delete Specific Transaction (SQL Injection in URL Parameter)
+
+**Route**: `DELETE /:id`
+**Vulnerable Code**:
+```javascript
+const result = await db.query(`DELETE FROM transactions WHERE transaction_id = ${transactionId} RETURNING *`);
+```
+
+**Injection Example**:
+- URL: `/105 OR 1=1`
+- Results in SQL: `DELETE FROM transactions WHERE transaction_id = 105 OR 1=1 RETURNING *`
+- **Consequence**: Deletes all transactions instead of just transaction ID 105.
+
+### 5. Get All Transactions for a Specific User (SQL Injection in Query Parameters)
+
+**Route**: `GET /user/:id`
+**Vulnerable Code**:
+```javascript
+let queryString = `SELECT * FROM transactions WHERE from_user_id = ${userId}`;
+// ... appending query parameters
+```
+
+**Injection Example**:
+- URL: `/user/105?amount=1000 OR 1=1`
+- Results in SQL: `SELECT * FROM transactions WHERE from_user_id = 105 AND amount = '1000 OR 1=1'`
+- **Consequence**: This could potentially expose all transactions in the database, not just those related to user 105.
+
+### Recommendations for Prevention:
+
+- **Use Prepared Statements**: Replace direct insertion of variables in SQL queries with placeholders and prepared statements.
+- **Validate and Sanitize Inputs**: Ensure that inputs like `transactionId`, `user_id`, `amount`, and `description` are strictly validated and sanitized.
+- **Implement Proper Error Handling**: Avoid revealing detailed error messages that could assist an attacker in formulating an injection strategy.
