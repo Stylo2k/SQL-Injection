@@ -10,13 +10,9 @@ const HOST = process.env.HOST || "localhost";
 const {logger} = require('./config/config');
 Container.set('logger', logger);
 
-const {db, resetDBState} = require('./persistence/db');
+const {db} = require('./persistence/db');
 Container.set('db', db);
 
-
-
-// on startup reset the database
-resetDBState('./persistence/init.sql');
 
 
 app.get('/', (req, res) => {
@@ -26,10 +22,15 @@ app.get('/', (req, res) => {
 
 
 
-const authRouter = require('./routes/auth');
+const authRouter = require('./routes/auth'),
+    dbRouter = require('./routes/db'),
+    transactionsRouter = require('./routes/transactions'),
+    usersRouter = require('./routes/users');
 
 app.use('/api/auth', authRouter);
-
+app.use('/api/db', dbRouter);
+app.use('/api/users', usersRouter);
+app.use('/api/transactions', transactionsRouter);
 
 
 app.listen(PORT, () => {

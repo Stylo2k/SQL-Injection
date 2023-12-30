@@ -21,19 +21,15 @@ const db = {
     database.query(`INSERT INTO logs (username, query, timestamp, duration) VALUES ('${user}', '${text}', '${new Date().toISOString()}', ${duration})`);
 
     return res;
+  },
+  resetDBState : async (initSqlPath = __dirname + '/init.sql') => {
+    logger.info('resetting db');
+    query = await readFile(initSqlPath);
+    await database.query(query);
+    logger.info('Reset database')
   }
 }
 
 module.exports = {
-  db,
-  resetDBState : async (initSqlPath) => {
-    try {
-      logger.info('resetting db');
-      query = await readFile(initSqlPath);
-      await database.query(query);
-      logger.info('Reset database')
-    } catch (err) {
-      logger.error(`Error resetting database: ${err.message}`)
-    }
-  }
+  db
 }

@@ -53,7 +53,9 @@ router.post('/login', async (req, res) => {
     try {
         const result = await db.query(`SELECT * FROM users WHERE username = '${username}' AND password = '${password}' LIMIT 1`)        
         if (result.rows.length == 0) throw Error('Failed to login');
-        let token = jwt.sign({id: result.rows[0].user_id, role:'Basic'}, jwtSecret, {expiresIn: '1h'});
+        let role = 'Basic';
+        if (result.rows[0].is_admin) role = 'Admin';
+        let token = jwt.sign({id: result.rows[0].user_id, role}, jwtSecret, {expiresIn: '1h'});
         res.cookie('jwt', token);
         res.redirect(PROFILE_ENDPOINT);
     } catch (err) {

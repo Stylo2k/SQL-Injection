@@ -34,7 +34,8 @@ VALUES
     ('habib', 'Habib', 'Galbi', '12345', FALSE, 1001),
     ('erblin', 'Erblin', 'Ibrahimi', '12345', FALSE, 10000000),
     ('niels', 'Niels', 'Bugel', '12345', FALSE, 1234),
-    ('mootje', 'Mohammad', 'al Shakoush', '12345', TRUE, 100000);
+    ('mootje', 'Mohammad', 'al Shakoush', '12345', FALSE, 100000),
+    ('admin', 'admin', 'admin', 'a8rB#L7Ho3ug7TxKhQoXcuEDhNEpdQG3Gy64NxAafgxdgyF#*KoDrfL2JpHUqm$78VF47&*$mH79@GRrV2HE*D&LqCPZM5dT8aBZJ2QD&XnG$9JG4ZT37QVVfXCK2#x8', TRUE, 100000000);
 
 
 INSERT INTO transactions
