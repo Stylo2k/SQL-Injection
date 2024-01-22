@@ -10,7 +10,9 @@ const express = require('express'),
 
 const app = express();
 
-app.use(cors({ origin: '*' }))
+// allow all cors
+app.use(cors({origin: true, credentials: true}));
+
 app.use(bodyParser.json());
 app.use(cookies());
 

@@ -1,3 +1,4 @@
 atsp-lab/
 node_modules/
-postgres-data/
+postgres-data/data
+pgadmin-data/

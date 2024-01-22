@@ -15,7 +15,7 @@ Container.set('db', db);
 
 
 
-app.get('/', (req, res) => {
+app.get('/api', (req, res) => {
     res.send('Api is running!')
 });
 
