@@ -27,7 +27,11 @@ router.get('/:id', userAuth, async (req, res) => {
     try {
         const result = await db.query(`SELECT * FROM transactions WHERE transaction_id = ${transactionId}`);
         // check if the from_user_id is the same as the user_id in the session
-        if (result.rows[0].from_user_id != req.session.user.id) throw Error('Not authorized');
+        if (
+            (result.rows[0].from_user_id != req.session.user.id)
+            && 
+            (req.session.user.role != 'Admin')
+            ) throw Error('Not authorized');
         if (result.rows.length == 0) throw Error('Transaction not found');
         res.send(result.rows);
     } catch (err) {
