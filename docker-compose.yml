@@ -15,14 +15,7 @@ services:
     networks:
       - api_nw
       - api_db
-  
-  # front-end:
-  #   build: ./frontend
-  #   ports:
-  #     - 80:80
-  #   networks:
-  #     - api_nw
-      
+
   postgres:
     image: postgres:10.4
     ports:

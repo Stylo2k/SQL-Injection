@@ -105,10 +105,12 @@ router.get('/signup', (req, res) => {
     res.send(`
         <form action="${SIGNUP_ENDPOINT}" method="POST">
             <input type="text" name="username" placeholder="username">
+            <input type="text" name="surname" placeholder="surname">
+            <input type="text" name="name" placeholder="name">
             <input type="password" name="password" placeholder="password">
             <input type="submit" value="Signup">
         </form>
-    `);
+        `);
 });
 
 // router for signup
@@ -121,10 +123,16 @@ router.post('/signup', async (req, res) => {
     }
 
     // get username and password from request body
-    const {username, password} = req.body;
+    const {
+        username,
+        password,
+        surname,
+        name,
+    } = req.body;
     // check if username and password are set
-    if (!username || !password) {
-        res.status(400).send('Username and password are required');
+    if (!username || !password || !surname || !name) {
+        res.status(400).send('Username, password, surname and name are required');
+        return;
     }
     
     // find if username already exists
@@ -132,7 +140,7 @@ router.post('/signup', async (req, res) => {
         const result = await db.query(`SELECT * FROM users WHERE username = '${username}' LIMIT 1`)        
         if (result.rows.length > 0) throw Error('Username already exists');
         // insert new user
-        const insertResult = await db.query(`INSERT INTO users (username, password) VALUES ('${username}', '${password}') RETURNING user_id`);
+        const insertResult = await db.query(`INSERT INTO users (username, password, surname, name) VALUES ('${username}', '${password}', '${surname}', '${name}') RETURNING user_id`);
         // create session
         req.session.user = insertResult.rows[0].user_id;
         // set the jwt cookie
