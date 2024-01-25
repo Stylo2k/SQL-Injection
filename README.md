@@ -18,6 +18,12 @@ Now you can run njsscan:
 njsscan ./backend --config .njsscan
 ```
 
+Now for bearer
+
+```bash
+./bin/bearer scan ./backend/
+```
+
 
 1. **Vulnerable Code Example**:
    ```javascript

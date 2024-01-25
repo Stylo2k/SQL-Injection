@@ -9,5 +9,7 @@ pkgs.mkShell {
     # Activate the virtual environment
     virtualenv --python=python3.8 .venv
     source .venv/bin/activate
+
+    curl -sfL https://raw.githubusercontent.com/Bearer/bearer/main/contrib/install.sh | sh
   '';
 }
