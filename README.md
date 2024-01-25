@@ -18,7 +18,8 @@ Now you can run njsscan:
 njsscan ./backend --config .njsscan
 ```
 
-Now for bearer
+Now for bearer (it will read the bearer.yml file):
+
 
 ```bash
 ./bin/bearer scan ./backend/
