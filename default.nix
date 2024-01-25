@@ -10,6 +10,7 @@ pkgs.mkShell {
     virtualenv --python=python3.8 .venv
     source .venv/bin/activate
 
+    pip install njsscan
     curl -sfL https://raw.githubusercontent.com/Bearer/bearer/main/contrib/install.sh | sh
   '';
 }

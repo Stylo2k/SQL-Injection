@@ -1,10 +1,62 @@
-# Install nix-shell
+# Practical approach to resolving SQL Injection vulnerabilities
+
+In this tutorial, we will be going through a simple banking application that has a few SQL injection vulnerabilities. You can find the source code on https://github.com/Stylo2k/SQL-Injection
+
+## Prerequisites
+
+### Knowledge about SQL injection
+
+This tutorial assumes that you have some basic knowledge about SQL injection vulnerabilities. If you are not familiar with SQL injection vulnerabilities, please read up using the following [link](https://portswigger.net/web-security/sql-injection#:~:text=First%2Dorder%20SQL%20injection%20occurs,stores%20it%20for%20future%20use.).
+
+### `docker`
+
+Before we delve into the finer details of the application and the vulnerabilities, let's first get the application running. This tutorial assumes that you have `docker` and `docker-compose` installed on your system. If you do not have these installed, please follow the instructions [here](https://docs.docker.com/get-docker/) and [here](https://docs.docker.com/compose/install/).
+
+### Installing nix-shell
+
+In order to make your life easier, we will be using a tool called `nix-shell`. `nix-shell` is a command-line tool provided by the Nix package manager, used for creating temporary environments that are isolated from the rest of the system. This allows us to easily install dependencies needed for specific projects without polluting our system with unnecessary packages. Moreover, it also allows us to define all dependencies in one place, and not have to worry about installing them manually.
+
+Please download and install `nix-shell` before continuing by running the following command:
 
 ```bash
 sh <(curl -L https://nixos.org/nix/install) --no-daemon
 ```
 
-## Use nix-shell to run njsscan
+Note that if you are running macOS, the `--no-daemon` flag is not supported. Instead, you should run the command
+
+```bash
+bash -c 'sh <(curl -L https://nixos.org/nix/install)'
+```
+
+or, if you are using another shell like `fish` (which does not support this `bash` syntax), you can run
+
+```bash
+bash -c 'sh <(curl -L https://nixos.org/nix/install)'
+```
+
+Verify that the installation was successful by running
+
+```bash
+nix-shell --version
+```
+
+If this is successful, you should see something like
+
+```bash
+nix-shell (Nix) 2.19.3
+```
+
+Next, try to run the following command to create a temporary environment:
+
+```bash
+nix-shell -p nix-info --run "nix-info -m"
+```
+
+If `nix-shell` is installed correctly, you should see a bunch of information about your system and the installation details of `nix-shell`.
+
+You can find a full list of the documentation of `nix-shell` (including all the parameters that you can pass) [here](https://nixos.org/manual/nix/stable/command-ref/nix-shell).
+
+### Using nix-shell
 
 In the root of the project, run the following command:
 
@@ -12,260 +64,173 @@ In the root of the project, run the following command:
 nix-shell
 ```
 
-Now you can run njsscan:
+This will start a pre-defined environment that we have provided in the project. `nix-shell` looks at `default.nix` and performs the instructions that are defined in the `shellHook`. Currently, it simply creates a virtual environment and activates it.
+
+## Application
+
+In order to run the application, simply run the following command:
 
 ```bash
-njsscan ./backend --config .njsscan
+docker-compose up
 ```
 
-Now for bearer (it will read the bearer.yml file):
+You can now access the application at `localhost:80/<END_POINT>`. For now, we have the following entry points:
 
+- `/api/auth/login`
+- `/api/auth/logout`
+- `/api/auth/signup`
+- `/api/auth/profile`
+- `/api/auth`
+- `/api/users`
+- `/api/transactions`
 
-```bash
-./bin/bearer scan ./backend/
-```
+### Familiarization
 
+Please take your time looking through the code and understanding how the application works. More specifically, analyse which endpoints are accessible to which users, and what the purpose of each endpoint is.
 
-1. **Vulnerable Code Example**:
-   ```javascript
-   await db.query(`SELECT * FROM users WHERE username = '${username}' AND password = '${password}' LIMIT 1`);
-   ```
+Note that you can find some sample login credentials in `postgres-data/sql/init.sql` at the very bottom. You can use these to login at `localhost:80/api/auth/login`. A successful login attempt should result in a JSON object being returned with some basic information about the user. Be sure to properly logout after logging in by clicking the logout button in `localhost:80/api/auth/logout`.
 
-2. **Demonstration of SQL Injection**:
-   - **Scenario**: Imagine a user inputs the following for `username` and `password`:
-     - `username`: `admin`
-     - `password`: `' OR '1'='1`
-   - **Injected SQL Query**:
-     ```sql
-     SELECT * FROM users WHERE username = 'admin' AND password = '' OR '1'='1' LIMIT 1
-     ```
-   - **Explanation**: This query will always return true due to the `OR '1'='1'` condition, potentially granting unauthorized access to the first user in the database, often an admin account.
+> **Q: What happens when you access `localhost:80/api/transactions` without logging in?**
 
-3. **Teaching the Consequences**:
-   - Explain how this vulnerability can allow an attacker to bypass authentication.
-   - Highlight the potential risks, such as data breaches, unauthorized access, and system compromise.
+> **Q: What happens when you access `localhost:80/api/transactions` after logging in as a regular user?**
 
-4. **Solution - Using Prepared Statements**:
-   - Modify the query to use prepared statements to prevent SQL injection.
-   - Example with Prepared Statement:
-     ```javascript
-     await db.query(`SELECT * FROM users WHERE username = ? AND password = ? LIMIT 1`, [username, password]);
-     ```
-   - This method ensures that user input is treated as data, not as part of the SQL command, effectively mitigating the risk of SQL injection.
+> **Q: Which user can currently view all users and transactions?**
 
+## Vulnerabilitiy Analysis
 
-5. **Vulnerable Code Example**:
-   ```javascript
-   await db.query(`SELECT * FROM users WHERE username = '${username}' AND password = '${password}' LIMIT 1`);
-   ```
+### Injection examples
 
-6. **Demonstration of SQL Injection for Specific User**:
-   - **Scenario**: An attacker wants to sign in as the "admin" user without knowing the actual password.
-   - **Injected Input**:
-     - `username`: `admin' --`
-     - `password`: (Can be anything, it will be ignored)
-   - **Injected SQL Query**:
-     ```sql
-     SELECT * FROM users WHERE username = 'admin' --' AND password = 'any_password' LIMIT 1
-     ```
-   - **Explanation**: Here, the `--` (double dash) is a SQL comment. Everything after `--` is ignored by the SQL server. This effectively turns the query into a check if there is a user with the username 'admin', without checking the password.
+**Scenario 1**
+Imagine a user inputs the following for `username` and `password`:
 
-7. **Consequences and Risks**:
-   - Explain that this type of injection can lead to unauthorized access to specific user accounts, especially accounts with higher privileges like admin accounts.
-   - Discuss potential risks such as data theft, privilege escalation, and unauthorized actions performed under the compromised account.
+- `username`: `admin`
+- `password`: `' OR '1'='1`
 
-8. **Secure Solution - Prepared Statements**:
-   - Revise the query to use prepared statements.
-   - Example with Prepared Statement:
-     ```javascript
-     await db.query(`SELECT * FROM users WHERE username = ? AND password = ? LIMIT 1`, [username, password]);
-     ```
-   - Prepared statements ensure that the input for the `username` and `password` is not treated as part of the SQL command.
+The SQL query that is executed is the following:
 
-
-Absolutely, I can provide a few more SQL injection examples for educational purposes. These examples will help demonstrate different ways SQL injection can be exploited and why it's crucial to write secure code.
-
-### Bypassing Authentication (Different Method)
-
-**Vulnerable Code Example**:
-```javascript
-await db.query(`SELECT * FROM users WHERE username = '${username}' AND password = '${password}' LIMIT 1`);
-```
-
-**Injected Input**:
-- `username`: `' OR 1=1 --`
-- `password`: (Can be anything, it will be ignored)
-
-**Injected SQL Query**:
 ```sql
-SELECT * FROM users WHERE username = '' OR 1=1 --' AND password = 'any_password' LIMIT 1
+SELECT * FROM users WHERE username='admin' AND password='' OR '1'='1';
 ```
 
-**Explanation**:
-- The `1=1` condition is always true, leading to the selection of all users. The comment `--` negates the password check, potentially logging in the attacker as the first user in the database.
+This query will always return true due to the `OR '1'='1'` condition, potentially granting unauthorized access to the first user in the database, often an admin account.
 
+> **Q: Explain how this vulnerability can allow an attack to bypass authentication.**
 
-Your provided code represents an Express.js router handling various routes related to user management. Each route has certain vulnerabilities to SQL injection due to the way user input is directly used in SQL queries. Here are some examples of SQL injections for each route:
+> **Q: Unlike before, are you now able to view all (or specific) user/transaction details?**
 
-### 1. Get Specific User (SQL Injection in Query Parameter)
+**Scenario 2**
+Attacker sends a body with:
 
-**Route**: `GET /:id`
-**Vulnerable Code**:
-```javascript
-const result = await db.query(`SELECT * FROM users WHERE user_id = ${userId} LIMIT 1`);
+```json
+{
+    "username": "attacker",
+    "password": "pass', true);--",
+    "is_admin": "false"
+}
 ```
 
-**Injection Example**:
-- Attacker modifies the URL to: `/105 OR 1=1`
-- Results in SQL: `SELECT * FROM users WHERE user_id = 105 OR 1=1 LIMIT 1`
-- **Consequence**: This would return all users instead of just the one with ID 105.
+This will result in the following SQL query being executed:
 
-### 2. Create New User (SQL Injection in POST Body)
-
-**Route**: `POST /`
-**Vulnerable Code**:
-```javascript
-const result = await db.query(`INSERT INTO users (username, password, is_admin) VALUES ('${username}', '${password}', ${is_admin}) RETURNING *`);
+```sql
+INSERT INTO users (username, password, is_admin) VALUES ('attacker', 'pass', true);--', 'false');
 ```
 
-**Injection Example**:
-- Attacker sends a body with: 
-  ```json
-  {
-      "username": "attacker",
-      "password": "pass', true);--",
-      "is_admin": "false"
-  }
-  ```
-- Results in SQL: `INSERT INTO users (username, password, is_admin) VALUES ('attacker', 'pass', true);--', false) RETURNING *`
-- **Consequence**: An attacker could create an admin user.
+> **Q: What can be a potential consequence of this vulnerability?**
 
-### 3. Update Specific User (SQL Injection in URL Parameter and POST Body)
+> **Q: Does this user have proper admin powers? Can it view everything?**
 
-**Route**: `PUT /:id`
-**Vulnerable Code**:
-```javascript
-const result = await db.query(`UPDATE users SET username = '${username}', password = '${password}', is_admin = ${is_admin} WHERE user_id = ${userId} RETURNING *`);
+After creating the admin user, try messing around on the website and see what you can do. Try to find out what the admin can do that the regular user cannot, and how much data is suddenly available to the hacker.
+
+## Detecting SQL Injection vulnerabilities
+
+By now, you have seen that many vulnerabilities can be exploited by injecting SQL queries into the application. It is evident that we must try to prevent this from happening. While people often manually browse through the code to try to find vulnerabilities, you can imagine that many mistakes go unnoticed due to human error. As such, many automated tools exist to (try to) detect as many vulnerabilities as possible in a code-base.
+
+The most popular tools are white-box scanners and black-box scanners. White-box scanners analyse the source code of an application, while black-box scanners analyse the application from the outside (i.e. by sending requests to the application and analysing the responses). In this tutorial, we will be mainly looking at a white-box scanner for Node.js applications called `njsscan`. Moreover, we will also use a SAST (Static Application Security Testing) tool called `bearer CLI` to scan our application for vulnerabilities.
+
+### Installing the tools
+
+Like we mentioned earlier, `nix-shell` will take care of the installation for us. However, if you are interested in installing the tools manually, the steps are relatively simple. Simply run the following commands:
+
+```bash
+npm install -g njsscan
+npm install -g @bearer/cli
 ```
 
-**Injection Example**:
-- URL: `/105`
-- Body:
-  ```json
-  {
-      "username": "attacker', is_admin = true WHERE user_id = 105;--",
-      "password": "pass",
-      "is_admin": "false"
-  }
-  ```
-- Results in SQL: `UPDATE users SET username = 'attacker', is_admin = true WHERE user_id = 105;--', password = 'pass', is_admin = false WHERE user_id = 105 RETURNING *`
-- **Consequence**: Attacker could gain admin privileges for user ID 105.
+alternatively, you can also run the following if you have Homebrew installed:
 
-### 4. Delete Specific User (SQL Injection in URL Parameter)
-
-**Route**: `DELETE /:id`
-**Vulnerable Code**:
-```javascript
-const result = await db.query(`DELETE FROM users WHERE user_id = ${userId} RETURNING *`);
+```bash
+brew install njsscan
+brew install Bearer/tap/bearer
 ```
 
-**Injection Example**:
-- URL: `/105 OR 1=1`
-- Results in SQL: `DELETE FROM users WHERE user_id = 105 OR 1=1 RETURNING *`
-- **Consequence**: Deletes all users instead of just user ID 105.
+### White-box scanning
 
-### Recommendations for Prevention:
+Now that you have `njsscan` installed, let's take a look at what we can do with the tool. Run the following command and read the documentation carefully:
 
-- **Use Prepared Statements**: Instead of concatenating user inputs directly into SQL queries, use prepared statements with placeholders.
-- **Validate Inputs**: Ensure that inputs like `userId`, `username`, `password`, and `is_admin` are validated for expected types and formats.
-- **Limit Privileges**: Database users should have the least privileges necessary to perform their tasks.
-
-
-The provided code sample shows various routes in an Express.js application managing transactions, with several potential SQL injection vulnerabilities. Here are some examples of SQL injections for each route:
-
-### 1. Get Specific Transaction (SQL Injection in URL Parameter)
-
-**Route**: `GET /:id`
-**Vulnerable Code**:
-```javascript
-const result = await db.query(`SELECT * FROM transactions WHERE transaction_id = ${transactionId}`);
+```bash
+njsscan --help
 ```
 
-**Injection Example**:
-- Attacker modifies the URL to: `/105 OR 1=1`
-- Results in SQL: `SELECT * FROM transactions WHERE transaction_id = 105 OR 1=1`
-- **Consequence**: This would return all transactions instead of just the one with ID 105.
+> **Q: What is the command for running `njsscan` on the `./backend` directory?**
 
-### 2. Create New Transaction (SQL Injection in POST Body)
+> Note: we will be using this directory for all our scanning
 
-**Route**: `POST /`
-**Vulnerable Code**:
-```javascript
-const result = await db.query(`INSERT INTO transactions (user_id, amount, description) VALUES (${user_id}, ${amount}, '${description}') RETURNING *`);
+Try running the command that you found in the previous question. As you can see, many (tiny) vulnerabilities were found of differeing vulnerabilities. This output is rather overwhelming, so let's try to narrow it down. For now, we are only interested in displaying the vulnerabilities in the files with the highest severity rules. Let's filter the results to only show those files. This is done by creating a so-called `.njsscan` file and adding the following contents:
+
+```yaml
+- nodejs-extensions:
+  - .js
+
+  ignore-filenames:
+  - auth.js
+
+  severity-filter:
+  - ERROR
 ```
 
-**Injection Example**:
-- Attacker sends a body with: 
-  ```json
-  {
-      "user_id": "105",
-      "amount": "1000",
-      "description": "Test'); DELETE FROM transactions;--"
-  }
-  ```
-- Results in SQL: `INSERT INTO transactions (user_id, amount, description) VALUES (105, 1000, 'Test'); DELETE FROM transactions;--') RETURNING *`
-- **Consequence**: An attacker could insert a transaction and potentially delete all transactions in the database.
+If you now run the command
 
-### 3. Update Specific Transaction (SQL Injection in URL Parameter and POST Body)
-
-**Route**: `PUT /:id`
-**Vulnerable Code**:
-```javascript
-const result = await db.query(`UPDATE transactions SET user_id = ${user_id}, amount = ${amount}, description = '${description}' WHERE transaction_id = ${transactionId} RETURNING *`);
+```bash
+njsscan --config .njsscan <PATH>
 ```
 
-**Injection Example**:
-- URL: `/105`
-- Body:
-  ```json
-  {
-      "user_id": "105",
-      "amount": "1000",
-      "description": "Updated', amount = 10000 WHERE transaction_id = 105;--"
-  }
-  ```
-- Results in SQL: `UPDATE transactions SET user_id = 105, amount = 1000, description = 'Updated', amount = 10000 WHERE transaction_id = 105;--' WHERE transaction_id = 105 RETURNING *`
-- **Consequence**: Attacker could update the transaction amount or other details for transaction ID 105.
+it will only show the vulnerabilities with the highest severities.
 
-### 4. Delete Specific Transaction (SQL Injection in URL Parameter)
+> **Q: How many vulnerabilities were found?**
 
-**Route**: `DELETE /:id`
-**Vulnerable Code**:
-```javascript
-const result = await db.query(`DELETE FROM transactions WHERE transaction_id = ${transactionId} RETURNING *`);
+> **Q: What is the CWE of the vulnerability that we are interested in?**
+
+> **Q: What is the filename that contains the SQL Injection vulnerabilities?**
+
+### SAST scanning
+
+Running `bearer` is relatively simple. Simply run the following command:
+
+```bash
+bearer scan ./backend
 ```
 
-**Injection Example**:
-- URL: `/105 OR 1=1`
-- Results in SQL: `DELETE FROM transactions WHERE transaction_id = 105 OR 1=1 RETURNING *`
-- **Consequence**: Deletes all transactions instead of just transaction ID 105.
+This will give you an output that looks fairly similar to the output of `njsscan`. However, `bearer` also provides a web interface that allows you to view the vulnerabilities in a more user-friendly way. To start the web interface, run the following command:
 
-### 5. Get All Transactions for a Specific User (SQL Injection in Query Parameters)
-
-**Route**: `GET /user/:id`
-**Vulnerable Code**:
-```javascript
-let queryString = `SELECT * FROM transactions WHERE from_user_id = ${userId}`;
-// ... appending query parameters
+```bash
+bearer ui
 ```
 
-**Injection Example**:
-- URL: `/user/105?amount=1000 OR 1=1`
-- Results in SQL: `SELECT * FROM transactions WHERE from_user_id = 105 AND amount = '1000 OR 1=1'`
-- **Consequence**: This could potentially expose all transactions in the database, not just those related to user 105.
+### Fixing the vulnerabilities
 
-### Recommendations for Prevention:
+Now that we have found the vulnerabilities, let's try to fix them. There are mainly two approaches:
 
-- **Use Prepared Statements**: Replace direct insertion of variables in SQL queries with placeholders and prepared statements.
-- **Validate and Sanitize Inputs**: Ensure that inputs like `transactionId`, `user_id`, `amount`, and `description` are strictly validated and sanitized.
-- **Implement Proper Error Handling**: Avoid revealing detailed error messages that could assist an attacker in formulating an injection strategy.
+1. Using query parameters
+2. Sanitizing the input
+
+Let us try to fix the vulnerabilities using both approaches. First, let's try to use query parameters. Query parameters are a way to separate the SQL query from the user input. This way, the user input is never directly injected into the SQL query, and thus cannot be used to inject malicious SQL queries. You can find more information about how to implement them [here](https://www.stackhawk.com/blog/node-js-sql-injection-guide-examples-and-prevention/).
+
+> **Q: After implementing the query parameters, run `njsscan` and `bearer` again. Give the number of vulnerabilities found.**
+
+As you can see, the number of vulnerabilities has decreased, but there are still some vulnerabilities left. This is because we have not yet sanitized the input. Sanitizing the input means that we remove any characters that could be used to inject SQL queries. You can find more information about how to implement this [here](https://www.stackhawk.com/blog/node-js-sql-injection-guide-examples-and-prevention/).
+
+> **Q: After implementing the sanitization as well, run `njsscan` and `bearer` again. Are there still SQL Injection vulnerabilities present in the code?**
+
+We see now that we have no more SQL injections left, even the second-order ones. Hooray! Well done!
+
+One quick note; while we did the previous steps manually, it is possible to do both at once and simply resolve the aforementioned issues as well by simply using the `sql-template-strings` package. This package allows us to safely inject variables into SQL queries. You can find the documentation [here](https://www.npmjs.com/package/sql-template-strings).

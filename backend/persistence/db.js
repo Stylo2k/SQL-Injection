@@ -24,9 +24,20 @@ const db = {
   },
   resetDBState : async (initSqlPath = __dirname + '/init.sql') => {
     logger.info('resetting db');
-    query = await readFile(initSqlPath);
+    const query = await readFile(initSqlPath);
     await database.query(query);
-    logger.info('Reset database')
+    logger.info('Reset database');
+  },
+  // Introducing a hypothetical function to simulate a second-order SQL injection
+  updateUserStatusBasedOnComments: async () => {
+    // Hypothetical retrieval of a user's last comment which might be maliciously crafted
+    const result = await database.query(`SELECT comment FROM user_comments WHERE user_id = 1;`);
+    if (result.rows.length > 0) {
+      const userComment = result.rows[0].comment;
+      // Using the retrieved comment in a new SQL query without proper parameterization
+      // This introduces a second-order SQL injection vulnerability
+      await database.query(`UPDATE users SET status = 'reviewed' WHERE user_comment = '${userComment}'`);
+    }
   }
 }
 
