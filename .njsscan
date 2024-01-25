@@ -1,0 +1,8 @@
+- nodejs-extensions:
+  - .js
+
+  ignore-filenames:
+  - auth.js
+
+  severity-filter:
+  - ERROR

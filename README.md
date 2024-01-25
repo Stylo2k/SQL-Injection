@@ -1,3 +1,24 @@
+# Install nix-shell
+
+```bash
+sh <(curl -L https://nixos.org/nix/install) --no-daemon
+```
+
+## Use nix-shell to run njsscan
+
+In the root of the project, run the following command:
+
+```bash
+nix-shell
+```
+
+Now you can run njsscan:
+
+```bash
+njsscan ./backend --config .njsscan
+```
+
+
 1. **Vulnerable Code Example**:
    ```javascript
    await db.query(`SELECT * FROM users WHERE username = '${username}' AND password = '${password}' LIMIT 1`);
