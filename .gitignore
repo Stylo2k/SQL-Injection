@@ -2,3 +2,4 @@ atsp-lab/
 node_modules/
 postgres-data/data
 pgadmin-data/
+bin/bearer
