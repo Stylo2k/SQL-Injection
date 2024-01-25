@@ -9,9 +9,5 @@ pkgs.mkShell {
     # Activate the virtual environment
     virtualenv --python=python3.8 .venv
     source .venv/bin/activate
-
-
-    # Install njsscan using pip
-    pip install njsscan
   '';
 }
